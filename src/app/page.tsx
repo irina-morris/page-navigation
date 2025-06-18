@@ -1,15 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { PageNavigation, Page } from "@/components/PageNavigation";
-import {
-  BasicInfoPage,
-  DetailsPage,
-  OtherPage,
-  EndingPage,
-} from "@/components/PageContent";
+import { useState, useCallback } from "react";
+import { PageNavigation, type Page } from "@/components/PageNavigation";
+import { BasicInfoPage } from "@/components/form-pages/BasicInfo";
+import { DetailsPage } from "@/components/form-pages/Details";
+import { OtherPage } from "@/components/form-pages/Other";
+import { EndingPage } from "@/components/form-pages/Ending";
 
-export default function Home(): React.JSX.Element {
+export default function Home() {
   const [pages, setPages] = useState<Page[]>([
     {
       id: "info",
@@ -33,17 +31,17 @@ export default function Home(): React.JSX.Element {
     },
   ]);
 
-  const [activePageId, setActivePageId] = useState<string>("info");
+  const [activePageId, setActivePageId] = useState("info");
 
-  const handlePageChange = (pageId: string): void => {
+  const handlePageChange = useCallback((pageId: string) => {
     setActivePageId(pageId);
-  };
+  }, []);
 
-  const handlePagesReorder = (newPages: Page[]): void => {
+  const handlePagesReorder = useCallback((newPages: Page[]) => {
     setPages(newPages);
-  };
+  }, []);
 
-  const handleAddPage = (index: number): void => {
+  const handleAddPage = useCallback((index: number) => {
     const newPage: Page = {
       id: `new-page-${Date.now()}`,
       title: "New Page",
@@ -61,17 +59,29 @@ export default function Home(): React.JSX.Element {
       ),
     };
 
-    const newPages = [...pages];
-    newPages.splice(index, 0, newPage);
-    setPages(newPages);
-  };
+    setPages((prev) => {
+      const newPages = [...prev];
+      newPages.splice(index, 0, newPage);
+      return newPages;
+    });
+  }, []);
 
   const activePage = pages.find((page) => page.id === activePageId);
+
+  // Fallback content if no active page is found
+  const activeContent = activePage?.content ?? (
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6 text-center">
+        <h2 className="text-white text-2xl font-bold">Page Not Found</h2>
+        <p className="text-slate-400">The requested page could not be found.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-screen bg-slate-800 flex flex-col">
       {/* Page Content */}
-      <div className="flex-1 overflow-auto">{activePage?.content}</div>
+      <div className="flex-1 overflow-auto">{activeContent}</div>
 
       {/* Navigation - Fixed at bottom */}
       <div className="shrink-0">

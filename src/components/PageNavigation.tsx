@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, type ReactNode } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -37,28 +37,37 @@ import {
   Flag,
   CircleCheck,
 } from "lucide-react";
+import { CONTEXT_ACTIONS, type ContextAction } from "@/lib/constants";
+
+// Helper function to get the appropriate icon for each page type
+function getPageIcon(pageTitle: string) {
+  switch (pageTitle.toLowerCase()) {
+    case "ending":
+      return <CircleCheck className="h-5 w-5 transition-colors duration-200" />;
+    default:
+      return <FileText className="h-5 w-5 transition-colors duration-200" />;
+  }
+}
 
 export interface Page {
-  id: string;
-  title: string;
-  content: React.ReactNode;
+  readonly id: string;
+  readonly title: string;
+  readonly content: ReactNode;
 }
 
 export interface PageNavigationProps {
-  pages: Page[];
-  activePageId: string;
-  onPageChange: (pageId: string) => void;
-  onPagesReorder: (pages: Page[]) => void;
-  onAddPage: (index: number) => void;
+  readonly pages: Page[];
+  readonly activePageId: string;
+  readonly onPageChange: (pageId: string) => void;
+  readonly onPagesReorder: (pages: Page[]) => void;
+  readonly onAddPage: (index: number) => void;
 }
 
 interface SortablePageTabProps {
-  page: Page;
-  isActive: boolean;
-  onClick: () => void;
-  onContextAction: (
-    action: "rename" | "duplicate" | "delete" | "setFirst" | "copy"
-  ) => void;
+  readonly page: Page;
+  readonly isActive: boolean;
+  readonly onClick: () => void;
+  readonly onContextAction: (action: ContextAction) => void;
 }
 
 function SortablePageTab({
@@ -66,7 +75,9 @@ function SortablePageTab({
   isActive,
   onClick,
   onContextAction,
-}: SortablePageTabProps): React.JSX.Element {
+}: SortablePageTabProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   const {
     attributes,
     listeners,
@@ -81,43 +92,41 @@ function SortablePageTab({
     transition,
   };
 
+  // Close dropdown when dragging starts
+  useEffect(() => {
+    if (isDragging) {
+      setDropdownOpen(false);
+    }
+  }, [isDragging]);
+
   const handleContextAction = useCallback(
-    (action: "rename" | "duplicate" | "delete" | "setFirst" | "copy"): void => {
+    (action: ContextAction) => {
       onContextAction(action);
     },
     [onContextAction]
   );
 
+  // Custom three-dot indicator for active tabs
   const ThreeDotsVertical = () => (
     <div className="flex flex-col items-center justify-center gap-0.5">
-      <div className="w-0.5 h-0.5 bg-gray-500 rounded-full"></div>
-      <div className="w-0.5 h-0.5 bg-gray-500 rounded-full"></div>
-      <div className="w-0.5 h-0.5 bg-gray-500 rounded-full"></div>
+      <div className="w-0.5 h-0.5 bg-gray-500 rounded-full" />
+      <div className="w-0.5 h-0.5 bg-gray-500 rounded-full" />
+      <div className="w-0.5 h-0.5 bg-gray-500 rounded-full" />
     </div>
   );
 
-  const getPageIcon = (pageTitle: string) => {
-    switch (pageTitle.toLowerCase()) {
-      case "ending":
-        return (
-          <CircleCheck className="h-5 w-5 transition-colors duration-200" />
-        );
-      default:
-        return <FileText className="h-5 w-5 transition-colors duration-200" />;
-    }
-  };
+  // Different icons for different page types - using the shared helper function
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="relative"
+      className={`relative ${isDragging ? "opacity-50" : ""}`}
       {...attributes}
-      {...listeners}
     >
       {isActive ? (
-        // Active tab - button opens dropdown menu
-        <DropdownMenu>
+        // Active tab shows context menu on click
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -125,13 +134,24 @@ function SortablePageTab({
                 h-10 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap
                 bg-white text-gray-900 border border-gray-200 shadow-sm hover:bg-gray-50
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1
-                ${isDragging ? "cursor-grabbing" : "cursor-grab"}
+                ${isDragging ? "cursor-grabbing" : "cursor-pointer"}
               `}
             >
-              <span className="text-orange-500">{getPageIcon(page.title)}</span>
-              <span className="transition-colors duration-200">
-                {page.title}
-              </span>
+              {/* Drag handle area - left part of the button */}
+              <div
+                className={`flex items-center gap-2 flex-1 ${
+                  isDragging ? "cursor-grabbing" : "cursor-grab"
+                }`}
+                {...listeners}
+              >
+                <span className="text-orange-500">
+                  {getPageIcon(page.title)}
+                </span>
+                <span className="transition-colors duration-200">
+                  {page.title}
+                </span>
+              </div>
+              {/* Dropdown trigger - right part */}
               <div className="ml-auto">
                 <ThreeDotsVertical />
               </div>
@@ -149,7 +169,7 @@ function SortablePageTab({
             </div>
             <div className="p-2">
               <DropdownMenuItem
-                onClick={() => handleContextAction("setFirst")}
+                onClick={() => handleContextAction(CONTEXT_ACTIONS.SET_FIRST)}
                 className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-50 cursor-pointer"
               >
                 <Flag className="h-4 w-4 text-blue-600 fill-blue-600" />
@@ -158,7 +178,7 @@ function SortablePageTab({
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleContextAction("rename")}
+                onClick={() => handleContextAction(CONTEXT_ACTIONS.RENAME)}
                 className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-50 cursor-pointer"
               >
                 <Edit3 className="h-4 w-4 text-gray-500" />
@@ -167,7 +187,7 @@ function SortablePageTab({
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleContextAction("copy")}
+                onClick={() => handleContextAction(CONTEXT_ACTIONS.COPY)}
                 className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-50 cursor-pointer"
               >
                 <Copy className="h-4 w-4 text-gray-500" />
@@ -176,7 +196,7 @@ function SortablePageTab({
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleContextAction("duplicate")}
+                onClick={() => handleContextAction(CONTEXT_ACTIONS.DUPLICATE)}
                 className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-gray-50 cursor-pointer"
               >
                 <Files className="h-4 w-4 text-gray-500" />
@@ -186,7 +206,7 @@ function SortablePageTab({
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-2 border-gray-200" />
               <DropdownMenuItem
-                onClick={() => handleContextAction("delete")}
+                onClick={() => handleContextAction(CONTEXT_ACTIONS.DELETE)}
                 className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-red-50 cursor-pointer"
               >
                 <Trash2 className="h-4 w-4 text-red-500" />
@@ -198,16 +218,17 @@ function SortablePageTab({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        // Inactive tab - button switches to this page
+        // Inactive tabs just switch to that page when clicked
         <Button
           variant="ghost"
           className={`
             h-10 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap
             bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200 hover:text-gray-600
             focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1
-            ${isDragging ? "cursor-grabbing" : "cursor-grab"}
+            ${isDragging ? "cursor-grabbing" : "cursor-pointer"}
           `}
           onClick={onClick}
+          {...listeners}
         >
           <span className="text-gray-500">{getPageIcon(page.title)}</span>
           <span className="transition-colors duration-200">{page.title}</span>
@@ -223,10 +244,11 @@ export function PageNavigation({
   onPageChange,
   onPagesReorder,
   onAddPage,
-}: PageNavigationProps): React.JSX.Element {
+}: PageNavigationProps) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  // Configure drag sensors - need some distance to avoid accidental drags
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -235,12 +257,12 @@ export function PageNavigation({
     })
   );
 
-  const handleDragStart = useCallback((event: DragStartEvent): void => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id);
   }, []);
 
   const handleDragEnd = useCallback(
-    (event: DragEndEvent): void => {
+    (event: DragEndEvent) => {
       const { active, over } = event;
 
       if (over && active.id !== over.id) {
@@ -258,22 +280,22 @@ export function PageNavigation({
     [pages, onPagesReorder]
   );
 
-  const handleContextAction = useCallback(
-    (action: "rename" | "duplicate" | "delete" | "setFirst" | "copy"): void => {
-      console.log(`Context action: ${action}`);
-    },
-    []
-  );
+  // TODO: Actually implement these context actions
+  const handleContextAction = useCallback((action: ContextAction) => {
+    console.log("Context action triggered:", action);
+    // Context actions would be implemented here based on requirements
+    // For now, this is a placeholder for future functionality
+  }, []);
 
   const handlePageChange = useCallback(
-    (pageId: string): void => {
+    (pageId: string) => {
       onPageChange(pageId);
     },
     [onPageChange]
   );
 
   const handleAddPage = useCallback(
-    (index: number): void => {
+    (index: number) => {
       onAddPage(index);
     },
     [onAddPage]
@@ -299,9 +321,11 @@ export function PageNavigation({
               strategy={horizontalListSortingStrategy}
             >
               {pages.map((page, index) => (
-                <React.Fragment key={page.id}>
+                <div key={page.id} className="flex items-center">
+                  {/* Plus button that appears on hover between tabs */}
                   <div
                     onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
                     className="relative flex items-center"
                   >
                     <Button
@@ -328,11 +352,13 @@ export function PageNavigation({
                     onClick={() => handlePageChange(page.id)}
                     onContextAction={handleContextAction}
                   />
-                </React.Fragment>
+                </div>
               ))}
 
+              {/* Plus button at the end */}
               <div
                 onMouseEnter={() => setHoveredIndex(pages.length)}
+                onMouseLeave={() => setHoveredIndex(null)}
                 className="relative flex items-center"
               >
                 <Button
@@ -354,10 +380,11 @@ export function PageNavigation({
               </div>
             </SortableContext>
 
+            {/* Always-visible "Add page" button */}
             <Button
               variant="outline"
               size="sm"
-              className="ml-2 h-10 px-3 bg-white border-gray-200 hover:bg-gray-50 text-gray-700 whitespace-nowrap flex-shrink-0"
+              className="ml-2 h-10 px-3 bg-white border-gray-200 hover:bg-gray-50 text-gray-700 whitespace-nowrap flex-shrink-0 cursor-pointer"
               onClick={() => handleAddPage(pages.length)}
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -366,13 +393,22 @@ export function PageNavigation({
           </div>
         </div>
 
+        {/* Shows the dragged item while dragging */}
         <DragOverlay>
           {activePage && (
             <Button
               variant="ghost"
               className="h-10 px-3 py-2 rounded-lg font-medium text-sm bg-blue-100 text-blue-700 border border-blue-200 shadow-lg cursor-grabbing flex items-center gap-2"
             >
-              <FileText className="h-4 w-4" />
+              <span
+                className={`[&>svg]:h-4 [&>svg]:w-4 ${
+                  activePage.id === activePageId
+                    ? "text-orange-500"
+                    : "text-gray-500"
+                }`}
+              >
+                {getPageIcon(activePage.title)}
+              </span>
               {activePage.title}
             </Button>
           )}
